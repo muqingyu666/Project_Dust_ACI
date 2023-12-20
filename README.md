@@ -1,5 +1,5 @@
 # Project_Dust_ACI
----
+
 ## Overview
 This repository contains the Python code used in our research for constructing a triple constraint framework involving Principal Component Analysis (PCA), Ice Water Path (IWP), and Dust Aerosol Optical Depth (DAOD). The primary objective of this framework is to decouple and analyze the nonlinear effects of dust and meteorological fields on high cloud properties. This approach is crucial for advancing our understanding of Aerosol-Cloud Interaction (ACI), particularly in the context of high clouds composed primarily of ice particles.
 
