@@ -14,8 +14,8 @@ The code in this repository is structured to facilitate replication and further 
 We welcome contributions from the scientific community. If you have suggestions for improvements or have found an issue, please feel free to open an issue or submit a pull request.
 
 ## Citation
-If you use this code or our research findings in your work, please cite our paper: ops, haven't been accepted yet
+If you use this code or our research findings in your work, please cite our paper: (*/ω＼*) ops, haven't been accepted yet (*/ω＼*)
 
 ## Contact
-For any inquiries or further collaboration, please contact muqy20@lzu.edu.cn
+For any inquiries or further collaboration, please don't hesitate to contact muqy20@lzu.edu.cn
 
