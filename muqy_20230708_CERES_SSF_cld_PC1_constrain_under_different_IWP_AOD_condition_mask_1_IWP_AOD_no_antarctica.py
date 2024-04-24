@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # @Author: Muqy
-# @Date:   2023-10-24 22:16:04
+# @Date:   2023-10-16 13:36:03
 # @Last Modified by:   Muqy
-# @Last Modified time: 2023-10-25 20:22:45
+# @Last Modified time: 2023-10-24 21:07:31
 #                  ___====-_  _-====___
 #            _--^^^#####//      \\#####^^^--_
 #         _-^##########// (    ) \\##########^-_
@@ -138,9 +138,9 @@ data_merra2_2010_2020_new_lon = xr.open_dataset(
 )
 
 # # Extract Dust aerosol data from all data
-Dust_AOD = data_merra2_2010_2020_new_lon[
-    "DUEXTTAU"
-].values.reshape(5376, 180, 360)
+Dust_AOD = data_merra2_2010_2020_new_lon["DUEXTTAU"].values.reshape(
+    5376, 180, 360
+)
 
 
 # Set the largest and smallest 5% of the data to nan
@@ -229,6 +229,9 @@ CERES_SSF_COD = CERES_SSF_COD[:, 30:, :]
 
 PC_all = PC_best_corr.reshape(-1, 150, 360)
 
+# PC_all = PC_best_corr_spatial.reshape(-1, 150, 360)
+# region
+
 # ------ Segmentation of cloud data within each PC interval ---------------------------------
 ### triout for IWP constrain the same time with PC1 gap constrain ####
 # first we need to divide IWP data into n intervals
@@ -241,12 +244,12 @@ PC_all = PC_best_corr.reshape(-1, 150, 360)
 # )
 # IWP_gap = divideIWP.main_gap()
 
-IWP_gap = np.array([0.5, 5, 50, 100])
+IWP_gap = np.array([0.5, 5, 50, 100, 500])
 
 # Filter the data by AOD gap
 divideAOD = DividePCByDataVolume(
     dataarray_main=Dust_AOD_filtered,
-    n=3,
+    n=4,
 )
 AOD_gap = divideAOD.main_gap()
 
@@ -484,6 +487,7 @@ ds.to_netcdf(
     # "/RAID01/data/Filtered_data/CERES_SSF_under_diverse_IWP_AOD_conditions_filtered_1_percent_no_antarctica_best_corr_spatial.nc"
 )
 
+# endregion
 
 CERES_SSF_cld_under_diverser_IWP_AOD_conditions = xr.open_dataset(
     "/RAID01/data/Filtered_data/CERES_SSF_under_diverse_IWP_AOD_conditions_filtered_1_percent_no_antarctica_250hPa_PC1_4_gaps.nc"
@@ -528,6 +532,11 @@ CTP_match_PC_gap_AOD_constrain_mean = (
 CEP_match_PC_gap_AOD_constrain_mean = (
     CERES_SSF_cld_under_diverser_IWP_AOD_conditions[
         "CEP_AOD_bin"
+    ].values
+)
+COD_match_PC_gap_IWP_constrain_mean = (
+    CERES_SSF_cld_under_diverser_IWP_AOD_conditions[
+        "COD_IWP_bin"
     ].values
 )
 
@@ -729,18 +738,117 @@ def plot_3d_colored_IWP_PC1_AOD_min_max_version(
     IWP_bin_values,
 
 
-colors = [
-    "#1f77b4",
-    "#ff7f0e",
-    "#2ca02c",
-    "#d62728",
-    "#9467bd",
-    "#8c564b",
-    "#e377c2",
-    "#7f7f7f",
-    "#bcbd22",
-    "#17becf",
-]
+def error_fill_3d_plot(
+    data_list,
+    xlabel,
+    ylabel,
+    zlabel,
+    legend_labels,
+    savefig_str,
+    zmin: float = None,
+    zmax: float = None,
+):
+    """
+    Create a 3D error fill plot with different colors for each IWP condition
+
+    Args:
+        data_list (list): List of data arrays for different IWP conditions
+        xlabel (str): Label for the x-axis
+        ylabel (str): Label for the y-axis
+        zlabel (str): Label for the z-axis
+        legend_labels (list): List of legend labels for each IWP condition
+        savefig_str (str): String for saving the figure
+    """
+    # Create a figure instance
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(111, projection="3d")
+
+    colors = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
+    ]
+
+    # Loop through data_list to create error fill plots for each IWP condition
+    for i, data in enumerate(data_list):
+        # Input array must be in shape of (PC1_gap, lat, lon)
+        # reshape data to (PC1_gap, lat*lon)
+        data = data.reshape(data.shape[0], -1)
+
+        # Calculate mean and std of each PC1 interval
+        data_y = np.round(np.nanmean(data, axis=1), 3)
+        data_x = np.round(np.arange(-2.5, 5.5, 0.05), 3)
+        data_std = np.nanstd(data, axis=1)
+
+        # Create up and down limit of error bar
+        data_up = data_y + data_std
+        data_down = data_y - data_std
+
+        # Create IWP condition coordinate on y-axis
+        iwp_condition = np.ones_like(data_x) * i
+
+        # Plot the mean line and fill between up and down limits for each IWP condition
+        ax.plot(
+            data_x,
+            iwp_condition,
+            data_y,
+            linewidth=2,
+            color=colors[i % len(colors)],
+        )
+        ax.add_collection3d(
+            plt.fill_between(
+                data_x,
+                data_down,
+                data_up,
+                facecolor=colors[i % len(colors)],
+                alpha=0.2,
+            ),
+            zs=i,
+            zdir="y",
+        )
+
+    # Add labels and title
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_zlabel(zlabel)
+    ax.set_zlim(zmin=zmin, zmax=zmax)
+
+    # Add legend
+    custom_lines = [
+        plt.Line2D([0], [0], color=colors[i % len(colors)], lw=3)
+        for i in range(len(data_list))
+    ]
+    ax.legend(custom_lines, legend_labels)
+
+    # Set the viewing angle
+    ax.view_init(elev=15, azim=-18)
+    ax.dist = 12
+
+    # Turn off the grid lines
+    ax.grid(False)
+
+    # Save figure
+    os.makedirs(
+        "/RAID01/data/python_fig/fill_between_plot_cld_var/",
+        exist_ok=True,
+    )
+    plt.savefig(
+        "/RAID01/data/python_fig/fill_between_plot_cld_var/"
+        + savefig_str,
+        dpi=300,
+        facecolor="w",
+        edgecolor="w",
+        bbox_inches="tight",
+    )
+
+    plt.show()
 
 
 def error_fill_3d_plot_no_legend_3f(
@@ -784,76 +892,81 @@ def error_fill_3d_plot_no_legend_3f(
 
     # Loop through data_list to create error fill plots for each IWP condition
     for i, data in enumerate(data_list):
+        # Input array must be in shape of (PC1_gap, lat, lon)
+        # reshape data to (PC1_gap, lat*lon)
         data = data.reshape(data.shape[0], -1)
+
+        # Calculate mean and std of each PC1 interval
         data_y = np.round(np.nanmean(data, axis=1), 3)
-        data_x = np.round(np.arange(-3, 6, 0.06), 3)
+        data_x = np.round(np.arange(-3, 6, 0.03), 3)
         data_std = np.nanstd(data, axis=1)
+
+        # Create up and down limit of error bar
         data_up = data_y + data_std
         data_down = data_y - data_std
+
+        # Create IWP condition coordinate on y-axis
         iwp_condition = np.ones_like(data_x) * i
 
+        # Plot the mean line and fill between up and down limits for each IWP condition
         ax.plot(
             data_x,
             iwp_condition,
             data_y,
             linewidth=2,
-            color=COLORS[i % len(COLORS)],
+            color=colors[i % len(colors)],
         )
         ax.add_collection3d(
             plt.fill_between(
                 data_x,
                 data_down,
                 data_up,
-                facecolor=COLORS[i % len(COLORS)],
-                alpha=0.35,
+                facecolor=colors[i % len(colors)],
+                alpha=0.25,
             ),
             zs=i,
             zdir="y",
         )
 
-    # Annotate figure
-    for key, value in annotations.items():
-        fig.text(*key, value, va="top", fontsize=21)
+    # Add labels and title
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_zlabel(zlabel)
+    ax.set_zlim(zmin=zmin, zmax=zmax)
 
-    yticks = np.linspace(
-        0, len(IWP_or_AOD_bin_values) - 1, 7, dtype=int
-    )
-    xticks = list(XTICK_LABELS.keys())
+    # Define the number of ticks you want for y and z axes (for example 5)
+    n_ticks = 7
 
-    ax.set(
-        xlabel=xlabel,
-        ylabel=ylabel,
-        zlabel=zlabel,
-        yticks=yticks,
-        xticks=xticks,
-        zlim=(zmin, zmax),
-    )
+    # Define tick positions for each axis
+
+    yticks = np.linspace(0, IWP_or_AOD_bin - 1, n_ticks, dtype=int)
+
+    # Set tick positions
+    ax.set_yticks(yticks)
+
+    # Set tick labels using the provided bin values and format them with three decimal places
     ax.set_yticklabels(
         [
-            "{:.1f}".format(val)
+            "{:.3f}".format(val)
             for val in IWP_or_AOD_bin_values[yticks]
         ]
     )
-    ax.set_xticklabels([XTICK_LABELS[val] for val in xticks])
-    ax.set_xlim(-4.3, 5.3)
 
-    ax.view_init(elev=elev_angle, azim=azim_angle)
-    ax.dist = 12
-    ax.set_facecolor("none")
-    ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-    ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-    ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    # Set the viewing angle
+    ax.view_init(elev=15, azim=-13)
+    ax.dist = 11
 
-    ax.grid(
-        True,
-        color="silver",
-        linestyle="-.",
-        linewidth=0.3,
-        alpha=0.4,
+    # Turn off the grid lines
+    ax.grid(False)
+
+    # Save figure
+    os.makedirs(
+        "/RAID01/data/python_fig/fill_between_plot_cld_var/",
+        exist_ok=True,
     )
-
     plt.savefig(
-        os.path.join(savefig_path, savefig_str),
+        "/RAID01/data/python_fig/fill_between_plot_cld_var/"
+        + savefig_str,
         dpi=300,
         facecolor="w",
         edgecolor="w",
@@ -882,11 +995,9 @@ def error_fill_3d_plot_no_legend_1f(
     ylabel,
     zlabel,
     IWP_or_AOD_bin_values,
-    elev_angle,
-    azim_angle,
+    PC1_bin_values,
     savefig_str,
     savefig_path,
-    annotations: dict,
     zmin: float = None,
     zmax: float = None,
 ):
@@ -923,10 +1034,6 @@ def error_fill_3d_plot_no_legend_1f(
             zdir="y",
         )
 
-    # Annotate figure
-    for key, value in annotations.items():
-        fig.text(*key, value, va="top", fontsize=21)
-
     yticks = np.linspace(
         0, len(IWP_or_AOD_bin_values) - 1, 7, dtype=int
     )
@@ -949,7 +1056,7 @@ def error_fill_3d_plot_no_legend_1f(
     ax.set_xticklabels([XTICK_LABELS[val] for val in xticks])
     ax.set_xlim(-4.3, 5.3)
 
-    ax.view_init(elev=elev_angle, azim=azim_angle)
+    ax.view_init(elev=26, azim=-20)
     ax.dist = 12
     ax.set_facecolor("none")
     ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
@@ -997,7 +1104,9 @@ def error_fill_3d_plot_no_legend_1f_4_gaps(
     zmin: float = None,
     zmax: float = None,
 ):
-    fig = plt.figure(figsize=(12, 10), dpi=400)
+    fig = plt.figure(
+        figsize=(6, 6), constrained_layout=True, dpi=300
+    )
     ax = fig.add_subplot(111, projection="3d")
 
     for i, data in enumerate(data_list):
@@ -1022,25 +1131,25 @@ def error_fill_3d_plot_no_legend_1f_4_gaps(
                 data_down,
                 data_up,
                 facecolor=COLORS[i % len(COLORS)],
-                alpha=0.38,
+                alpha=0.35,
             ),
             zs=i,
             zdir="y",
         )
 
-    ax.grid(
-        True,
-        color="silver",
-        linestyle="-.",
-        linewidth=0.3,
-        alpha=0.4,
-    )
+    # Annotate figure
+    for key, value in annotations.items():
+        fig.text(*key, value, va='top',fontsize=21)
+        
     yticks = np.linspace(
         0, len(IWP_or_AOD_bin_values) - 1, 7, dtype=int
     )
     xticks = list(XTICK_LABELS.keys())
 
     ax.set(
+        xlabel=xlabel,
+        ylabel=ylabel,
+        zlabel=zlabel,
         yticks=yticks,
         xticks=xticks,
         zlim=(zmin, zmax),
@@ -1055,36 +1164,30 @@ def error_fill_3d_plot_no_legend_1f_4_gaps(
     ax.set_xlim(-4.3, 5.3)
 
     ax.view_init(elev=elev_angle, azim=azim_angle)
+    ax.dist = 12
     ax.set_facecolor("none")
     ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 
-    # set font size for tick labels
-    ax.tick_params(axis="x", which="major", pad=8, labelsize=17)
-    ax.tick_params(axis="y", which="major", pad=8, labelsize=17)
-    ax.tick_params(axis="z", which="major", pad=8, labelsize=17)
-
-    ax.set_xlabel(xlabel, fontsize=20, labelpad=22)
-    ax.set_ylabel(ylabel, fontsize=20, labelpad=22)
-    ax.set_zlabel(zlabel, fontsize=20, labelpad=22)
-
-    ax.set_proj_type("persp")
-    ax.set_box_aspect((1, 1, 0.8))
-
-    # Annotate figure
-    for key, value in annotations.items():
-        fig.text(*key, value, va="top", fontsize=27)
+    ax.grid(
+        True,
+        color="silver",
+        linestyle="-.",
+        linewidth=0.3,
+        alpha=0.4,
+    )
 
     plt.savefig(
         os.path.join(savefig_path, savefig_str),
-        dpi=400,
+        dpi=300,
         facecolor="w",
         edgecolor="w",
-        # bbox_inches="tight",
+        bbox_inches="tight",
     )
 
     plt.show()
+
 
 
 COLORS = [
@@ -1109,7 +1212,9 @@ def error_fill_3d_plot_no_legend_3f_4_gaps(
     zmin: float = None,
     zmax: float = None,
 ):
-    fig = plt.figure(figsize=(12, 10), dpi=400)
+    fig = plt.figure(
+        figsize=(6, 6), constrained_layout=True, dpi=300
+    )
     ax = fig.add_subplot(111, projection="3d")
 
     for i, data in enumerate(data_list):
@@ -1134,25 +1239,25 @@ def error_fill_3d_plot_no_legend_3f_4_gaps(
                 data_down,
                 data_up,
                 facecolor=COLORS[i % len(COLORS)],
-                alpha=0.38,
+                alpha=0.35,
             ),
             zs=i,
             zdir="y",
         )
 
-    ax.grid(
-        True,
-        color="silver",
-        linestyle="-.",
-        linewidth=0.3,
-        alpha=0.4,
-    )
+    # Annotate figure
+    for key, value in annotations.items():
+        fig.text(*key, value, va='top',fontsize=21)
+
     yticks = np.linspace(
         0, len(IWP_or_AOD_bin_values) - 1, 7, dtype=int
     )
     xticks = list(XTICK_LABELS.keys())
 
     ax.set(
+        xlabel=xlabel,
+        ylabel=ylabel,
+        zlabel=zlabel,
         yticks=yticks,
         xticks=xticks,
         zlim=(zmin, zmax),
@@ -1167,33 +1272,26 @@ def error_fill_3d_plot_no_legend_3f_4_gaps(
     ax.set_xlim(-4.3, 5.3)
 
     ax.view_init(elev=elev_angle, azim=azim_angle)
+    ax.dist = 12
     ax.set_facecolor("none")
     ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
     ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 
-    # set font size for tick labels
-    ax.tick_params(axis="x", which="major", pad=8, labelsize=17)
-    ax.tick_params(axis="y", which="major", pad=8, labelsize=17)
-    ax.tick_params(axis="z", which="major", pad=8, labelsize=17)
-
-    ax.set_xlabel(xlabel, fontsize=20, labelpad=22)
-    ax.set_ylabel(ylabel, fontsize=20, labelpad=22)
-    ax.set_zlabel(zlabel, fontsize=20, labelpad=22)
-
-    ax.set_proj_type("persp")
-    ax.set_box_aspect((1, 1, 0.8))
-
-    # Annotate figure
-    for key, value in annotations.items():
-        fig.text(*key, value, va="top", fontsize=27)
+    ax.grid(
+        True,
+        color="silver",
+        linestyle="-.",
+        linewidth=0.3,
+        alpha=0.4,
+    )
 
     plt.savefig(
         os.path.join(savefig_path, savefig_str),
-        dpi=400,
+        dpi=300,
         facecolor="w",
         edgecolor="w",
-        # bbox_inches="tight",
+        bbox_inches="tight",
     )
 
     plt.show()
@@ -1328,22 +1426,12 @@ CEP_list_AOD = [
 
 # endregion
 
-# -------------------------------------------------------------
 # ------------------- Plotting --------------------------------
 # Call the error_fill_3d_plot function with your data
 
-# set font for mathrm
-plt.rcParams["mathtext.fontset"] = "cm"
-
 annotations = {
-    (0.15, 0.75): "(A)",
+    (0.1, 0.8): '(A)',
 }
-
-savefig_path = (
-    "/RAID01/data/python_fig/fill_between_plot_cld_var/"
-)
-if not os.path.exists(savefig_path):
-    os.makedirs(savefig_path)
 
 error_fill_3d_plot_no_legend_1f_4_gaps(
     data_list=HCF_list_IWP,
@@ -1351,17 +1439,17 @@ error_fill_3d_plot_no_legend_1f_4_gaps(
     ylabel="IWP (g/m" + r"$^2$)",
     zlabel="Cld Area (%)",
     IWP_or_AOD_bin_values=IWP_gap,
-    elev_angle=13,
-    azim_angle=22,
+    elev_angle=8,
+    azim_angle=-21,
     savefig_str="HCF_IWP_constrain_3D",
     savefig_path="/RAID01/data/python_fig/fill_between_plot_cld_var/",
     annotations=annotations,
-    zmin=-8,
+    zmin=-10,
     zmax=85,
 )
 
 annotations = {
-    (0.15, 0.75): "(B)",
+    (0.1, 0.8): '(B)',
 }
 
 # plot the constrained ice particle radiusd
@@ -1372,8 +1460,8 @@ error_fill_3d_plot_no_legend_1f_4_gaps(
     ylabel="IWP (g/m" + r"$^2$)",
     zlabel="Ice Particle Radius " + r"$(\mu m)$",
     IWP_or_AOD_bin_values=IWP_gap,
-    elev_angle=13,
-    azim_angle=22,
+    elev_angle=8,
+    azim_angle=-21,
     savefig_str="HCF_IPR_constrain_3D",
     savefig_path="/RAID01/data/python_fig/fill_between_plot_cld_var/",
     annotations=annotations,
@@ -1381,8 +1469,29 @@ error_fill_3d_plot_no_legend_1f_4_gaps(
     zmax=36,
 )
 
+# annotations = {
+#     (0.1, 0.8): '(C)',
+# }
+
+# Plot the constrained cloud top height
+# IWP constrained
+# error_fill_3d_plot_no_legend_1f_4_gaps(
+#     data_list=CTP_list_IWP,
+#     xlabel="PC1",
+#     ylabel="IWP (g/m" + r"$^2$)",
+#     zlabel="Cloud Top Pressure (hPa)",
+#     IWP_or_AOD_bin_values=IWP_gap,
+#     elev_angle=8,
+#     azim_angle=-21,
+#     savefig_str="HCF_CTP_constrain_3D",
+#     savefig_path="/RAID01/data/python_fig/fill_between_plot_cld_var/",
+#     annotations=annotations,
+#     zmin=150,
+#     zmax=300,
+# )
+
 annotations = {
-    (0.15, 0.75): "(C)",
+    (0.1, 0.8): '(C)',
 }
 
 # Plot the constrained cloud effect height
@@ -1393,8 +1502,8 @@ error_fill_3d_plot_no_legend_1f_4_gaps(
     ylabel="IWP (g/m" + r"$^2$)",
     zlabel="Cloud Effective Pressure (hPa)",
     IWP_or_AOD_bin_values=IWP_gap,
-    elev_angle=13,
-    azim_angle=22,
+    elev_angle=8,
+    azim_angle=-21,
     savefig_str="HCF_CEP_constrain_3D",
     savefig_path="/RAID01/data/python_fig/fill_between_plot_cld_var/",
     annotations=annotations,
@@ -1402,11 +1511,10 @@ error_fill_3d_plot_no_legend_1f_4_gaps(
     zmax=300,
 )
 
-# -------------------------------------------------------------
 # ------------------- Plotting --------------------------------
 # Call the error_fill_3d_plot function with your data
 annotations = {
-    (0.15, 0.75): "(D)",
+    (0.1, 0.8): '(D)',
 }
 
 error_fill_3d_plot_no_legend_3f_4_gaps(
@@ -1415,19 +1523,19 @@ error_fill_3d_plot_no_legend_3f_4_gaps(
     ylabel="AOD",
     zlabel="Cld Area (%)",
     IWP_or_AOD_bin_values=AOD_gap,
-    elev_angle=13,
-    azim_angle=22,
+    elev_angle=8,
+    azim_angle=-21,
     savefig_str="HCF_AOD_constrain_3D",
     savefig_path="/RAID01/data/python_fig/fill_between_plot_cld_var/",
     annotations=annotations,
     zmin=-10,
-    zmax=95,
+    zmax=100,
 )
 
 # plot the constrained ice particle radiusd
 # AOD constrained
 annotations = {
-    (0.15, 0.75): "(E)",
+    (0.1, 0.8): '(E)',
 }
 
 error_fill_3d_plot_no_legend_3f_4_gaps(
@@ -1436,19 +1544,35 @@ error_fill_3d_plot_no_legend_3f_4_gaps(
     ylabel="AOD",
     zlabel="Ice Particle Radius " + r"$(\mu m)$",
     IWP_or_AOD_bin_values=AOD_gap,
-    elev_angle=13,
-    azim_angle=22,
+    elev_angle=8,
+    azim_angle=-21,
     savefig_str="IPR_AOD_constrain_3D",
     savefig_path="/RAID01/data/python_fig/fill_between_plot_cld_var/",
     annotations=annotations,
     zmin=14,
-    zmax=33,
+    zmax=36,
 )
+
+# Plot the constrained cloud top height
+# AOD constrained
+# error_fill_3d_plot_no_legend_3f_4_gaps(
+#     data_list=CTP_list_AOD,
+#     xlabel="PC1",
+#     ylabel="AOD",
+#     zlabel="Cloud Top Pressure (hPa)",
+#     IWP_or_AOD_bin_values=AOD_gap,
+#     elev_angle=8,
+#     azim_angle=-21,
+#     savefig_str="CTP_AOD_constrain_3D",
+#     savefig_path="/RAID01/data/python_fig/fill_between_plot_cld_var/",
+#     zmin=150,
+#     zmax=300,
+# )
 
 # Plot the constrained cloud effect height
 # AOD constrained
 annotations = {
-    (0.15, 0.75): "(F)",
+    (0.1, 0.8): '(F)',
 }
 
 error_fill_3d_plot_no_legend_3f_4_gaps(
@@ -1456,12 +1580,12 @@ error_fill_3d_plot_no_legend_3f_4_gaps(
     xlabel="PC1",
     ylabel="AOD",
     zlabel="Cloud Effective Pressure (hPa)",
-    IWP_or_AOD_bin_values=AOD_gap,
-    elev_angle=13,
-    azim_angle=22,
+    IWP_or_AOD_bin_values=IWP_gap,
+    elev_angle=8,
+    azim_angle=-21,
     savefig_str="CEP_AOD_constrain_3D",
     savefig_path="/RAID01/data/python_fig/fill_between_plot_cld_var/",
     annotations=annotations,
-    zmin=175,
-    zmax=290,
+    zmin=150,
+    zmax=300,
 )
