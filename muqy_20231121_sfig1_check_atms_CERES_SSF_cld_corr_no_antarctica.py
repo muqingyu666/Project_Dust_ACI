@@ -2,23 +2,8 @@
 # @Author: Muqy
 # @Date:   2023-07-16 13:27:33
 # @Last Modified by:   Muqy
-# @Last Modified time: 2023-11-21 21:15:36
+# @Last Modified time: 2024-11-08 10:33
 
-"""
-
-    Code to check the correlation between PC1 and atmospheric variables
-    
-    Owner: Mu Qingyu
-    version 1.0
-    Created: 2022-12-08
-    
-    Including the following parts:
-        
-        1) Read the PC1 and atmospheric variables data
-        
-        2) Plot the correlation between PC1 and atmospheric variables
-        
-"""
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import numpy as np
@@ -59,27 +44,17 @@ Instability_250_300 = ds_vars["Instab"]
 # exclude polar region from all atms variables
 Temperature_250 = Temperature_250.sel(lat=slice(-60, 90))
 Temperature_300 = Temperature_300.sel(lat=slice(-60, 90))
-RelativeHumidity_250 = RelativeHumidity_250.sel(
-    lat=slice(-60, 90)
-)
-VerticalVelocity_250 = VerticalVelocity_250.sel(
-    lat=slice(-60, 90)
-)
+RelativeHumidity_250 = RelativeHumidity_250.sel(lat=slice(-60, 90))
+VerticalVelocity_250 = VerticalVelocity_250.sel(lat=slice(-60, 90))
 Instability_250_300 = Instability_250_300.sel(lat=slice(-60, 90))
 
 # reshape all data to (time, lat, lon)
 PC1_data = PC1_data.values.reshape(-1, 150, 360)
 Temperature_250 = Temperature_250.values.reshape(-1, 150, 360)
 Temperature_300 = Temperature_300.values.reshape(-1, 150, 360)
-RelativeHumidity_250 = RelativeHumidity_250.values.reshape(
-    -1, 150, 360
-)
-VerticalVelocity_250 = VerticalVelocity_250.values.reshape(
-    -1, 150, 360
-)
-Instability_250_300 = Instability_250_300.values.reshape(
-    -1, 150, 360
-)
+RelativeHumidity_250 = RelativeHumidity_250.values.reshape(-1, 150, 360)
+VerticalVelocity_250 = VerticalVelocity_250.values.reshape(-1, 150, 360)
+Instability_250_300 = Instability_250_300.values.reshape(-1, 150, 360)
 
 ##############################################################################
 #### Plot atms variables vary with PC1 ######################################
@@ -96,29 +71,21 @@ filter_atmos_fit_PC1 = FilterAtmosDataFitPCgap(
 )
 
 # Apply the Filter_data_fit_PC1_gap_new method to your data
-RelativeH_filtered = (
-    filter_atmos_fit_PC1.Filter_data_fit_PC1_gap_new(
-        Atms_data=RelativeHumidity_250,
-        PC_data=PC1_data,
-    )
+RelativeH_filtered = filter_atmos_fit_PC1.Filter_data_fit_PC1_gap_new(
+    Atms_data=RelativeHumidity_250,
+    PC_data=PC1_data,
 )
-Temperature_filtered = (
-    filter_atmos_fit_PC1.Filter_data_fit_PC1_gap_new(
-        Atms_data=Temperature_300,
-        PC_data=PC1_data,
-    )
+Temperature_filtered = filter_atmos_fit_PC1.Filter_data_fit_PC1_gap_new(
+    Atms_data=Temperature_300,
+    PC_data=PC1_data,
 )
-Wvelocity_filtered = (
-    filter_atmos_fit_PC1.Filter_data_fit_PC1_gap_new(
-        Atms_data=VerticalVelocity_250,
-        PC_data=PC1_data,
-    )
+Wvelocity_filtered = filter_atmos_fit_PC1.Filter_data_fit_PC1_gap_new(
+    Atms_data=VerticalVelocity_250,
+    PC_data=PC1_data,
 )
-Stability_filtered = (
-    filter_atmos_fit_PC1.Filter_data_fit_PC1_gap_new(
-        Atms_data=Instability_250_300,
-        PC_data=PC1_data,
-    )
+Stability_filtered = filter_atmos_fit_PC1.Filter_data_fit_PC1_gap_new(
+    Atms_data=Instability_250_300,
+    PC_data=PC1_data,
 )
 
 # --------------------------------------------------------------------------- #
@@ -168,9 +135,7 @@ def plot_error_fill_between(datasets, var_names, PC1_bin):
         )
 
         # Create plot
-        (line,) = ax.plot(
-            PC1_bin, mean, label=var_name, color=color
-        )
+        (line,) = ax.plot(PC1_bin, mean, label=var_name, color=color)
         ax.fill_between(
             PC1_bin,
             mean - std_err,
@@ -271,9 +236,7 @@ def plot_error_fill_between(datasets, var_names, PC1_bin):
         std_err = np.nanstd(data, axis=(1, 2))
 
         # Create plot
-        (line,) = ax.plot(
-            PC1_bin, mean, label=var_name, color=color
-        )
+        (line,) = ax.plot(PC1_bin, mean, label=var_name, color=color)
         ax.fill_between(
             PC1_bin,
             mean - std_err,
